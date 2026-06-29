@@ -8,10 +8,9 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-st.title("🏙️ 3D City Escape Simulator (Fixed Engine)")
+st.title("🏙️ 3D City Escape Simulator (Steuerung Fix)")
 st.write("Klicke in das Spielfeld. Steuerung mit **WASD / Pfeiltasten**. Überlebe 5 Minuten vor der Polizei! Drücke **R** für einen manuellen Reset.")
 
-# Das komplette, überarbeitete Spiel-Skript
 game_html = """
 <!DOCTYPE html>
 <html lang="de">
@@ -87,11 +86,6 @@ game_html = """
         sun.castShadow = true;
         sun.shadow.mapSize.width = 2048;
         sun.shadow.mapSize.height = 2048;
-        sun.shadow.camera.near = 0.5;
-        sun.shadow.camera.far = 1500;
-        const d = 300;
-        sun.shadow.camera.left = -d; sun.shadow.camera.right = d;
-        sun.shadow.camera.top = d; sun.shadow.camera.bottom = -d;
         scene.add(sun);
 
         // ==========================================
@@ -107,34 +101,30 @@ game_html = """
 
         const collisionObstacles = [];
         const npcTraffic = [];
-        const npcPedestrians = [];
 
-        // Geometrie & Material-Pools
         const boxGeo = new THREE.BoxGeometry(1, 1, 1);
         const planeGeo = new THREE.PlaneGeometry(1, 1);
         const cylGeo = new THREE.CylinderGeometry(1, 1, 1, 16);
 
-        // ==========================================
-        // 3. PROZEDURALER STADTGENERATOR (GRAFIK UPDATE)
-        // ==========================================
+        // GROUND
         const groundMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.9 });
         const ground = new THREE.Mesh(new THREE.PlaneGeometry(mapSize, mapSize), groundMat);
         ground.rotation.x = -Math.PI / 2;
         ground.receiveShadow = true;
         scene.add(ground);
 
+        // ==========================================
+        // 3. PROZEDURALER STADTGENERATOR
+        // ==========================================
         for (let x = -mapSize/2; x < mapSize/2; x += blockSize) {
             for (let z = -mapSize/2; z < mapSize/2; z += blockSize) {
-                // Straßenbahn-Asphalt erstellen
                 createAdvancedRoads(x, z, blockSize);
                 
-                // Startzone schützen
                 if (Math.abs(x) < blockSize && Math.abs(z) < blockSize) {
                     createDecorativeTrees(x, z);
                     continue;
                 }
 
-                // Gehweg-System (Erhöhter Beton)
                 const innerW = blockSize - roadWidth;
                 const swMat = new THREE.MeshStandardMaterial({ color: 0x71717a, roughness: 0.7 });
                 const sw = new THREE.Mesh(boxGeo, swMat);
@@ -143,7 +133,6 @@ game_html = """
                 sw.receiveShadow = true;
                 scene.add(sw);
 
-                // Detailliertes Gebäude platzieren
                 if (Math.random() > 0.15) {
                     createProBuilding(x, z, innerW);
                 } else {
@@ -161,7 +150,6 @@ game_html = """
             road.receiveShadow = true;
             scene.add(road);
 
-            // Weiße Fahrbahnbegrenzungen (Mittelstreifen)
             const lineMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
             const mLine = new THREE.Mesh(planeGeo, lineMat);
             mLine.scale.set(0.2, size, 1); mLine.rotation.x = -Math.PI / 2;
@@ -177,8 +165,6 @@ game_html = """
             const chosenColor = buildingColors[Math.floor(Math.random() * buildingColors.length)];
 
             const bGroup = new THREE.Group();
-            
-            // Fassade
             const body = new THREE.Mesh(boxGeo, new THREE.MeshStandardMaterial({ color: chosenColor, roughness: 0.4, metalness: 0.1 }));
             body.scale.set(buildW, h, buildW);
             body.position.y = h / 2;
@@ -186,13 +172,11 @@ game_html = """
             body.receiveShadow = true;
             bGroup.add(body);
 
-            // Dachkante/Struktur
             const roof = new THREE.Mesh(boxGeo, new THREE.MeshStandardMaterial({ color: 0x09090b }));
             roof.scale.set(buildW + 1, 1.5, buildW + 1);
             roof.position.y = h + 0.75;
             bGroup.add(roof);
 
-            // Fensterstrukturen simulieren
             const winGeo = new THREE.PlaneGeometry(1.4, 2);
             const winMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
 
@@ -212,7 +196,6 @@ game_html = """
             bGroup.position.set(x + blockSize/2, 0.4, z + blockSize/2);
             scene.add(bGroup);
 
-            // Exakte Kollisionsbox generieren
             const staticBox = new THREE.Box3().setFromObject(body);
             collisionObstacles.push({ box: staticBox, mesh: body });
         }
@@ -241,8 +224,6 @@ game_html = """
         // ==========================================
         // 4. ENTITIES: SPIELER, POLIZEI & TRAFFIC
         // ==========================================
-        
-        // SPIELER (Sportwagen)
         const playerCar = new THREE.Group();
         const pBody = new THREE.Mesh(boxGeo, new THREE.MeshStandardMaterial({ color: 0xdc2626, metalness: 0.8, roughness: 0.1 }));
         pBody.scale.set(2.4, 0.65, 4.6); pBody.position.y = 0.5; pBody.castShadow = true;
@@ -256,7 +237,6 @@ game_html = """
         scene.add(playerCar);
         const playerBox = new THREE.Box3();
 
-        // POLIZEI (Verfolger)
         const policeCar = new THREE.Group();
         const polBody = new THREE.Mesh(boxGeo, new THREE.MeshStandardMaterial({ color: 0x1d4ed8, metalness: 0.5, roughness: 0.2 }));
         polBody.scale.set(2.4, 0.7, 4.6); polBody.position.y = 0.5; polBody.castShadow = true;
@@ -274,9 +254,7 @@ game_html = """
         scene.add(policeCar);
         const policeBox = new THREE.Box3();
 
-        // ZIVIL-VERKEHR (Geordnetes Fahren ohne Ineinander-Clashing)
         const trafficColors = [0x059669, 0xd97706, 0x6d28d9, 0x4b5563, 0x0891b2];
-        
         function generateTraffic(startX, startZ, moveOnX) {
             const aiCar = new THREE.Group();
             const aiBody = new THREE.Mesh(boxGeo, new THREE.MeshStandardMaterial({ color: trafficColors[Math.floor(Math.random() * trafficColors.length)], roughness: 0.3 }));
@@ -292,7 +270,6 @@ game_html = """
             });
         }
 
-        // Spawne Verkehrs-Teilnehmer auf den Hauptstraßen-Achsen
         for (let i = -400; i < 400; i += 90) {
             generateTraffic(i, -14, true);
             generateTraffic(14, i, false);
@@ -300,7 +277,7 @@ game_html = """
         }
 
         // ==========================================
-        // 5. PHYSIK, PHYSIK-ENGINE (AXIS-SEPARATED COLLISION) & INPUT
+        // 5. INPUTS & STEUERUNGS-ENGINE (FIXED)
         // ==========================================
         let speed = 0, maxSpeed = 2.5, accel = 0.055, friction = 0.025, angle = 0, turnSpeed = 0.048;
         const keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
@@ -311,7 +288,6 @@ game_html = """
         });
         window.addEventListener('keyup', (e) => { if (e.key in keys) keys[e.key] = false; });
 
-        // COUNTDOWN TIMER INTERVALL
         const timerInterval = setInterval(() => {
             if (!gameActive) return;
             timeLeft--;
@@ -337,16 +313,18 @@ game_html = """
         }
 
         // ==========================================
-        // 6. ENGINE CORE LOOP (ANIMATE)
+        // 6. ENGINE CORE LOOP
         // ==========================================
         function animate() {
             requestAnimationFrame(animate);
             if (!gameActive) return;
 
-            // --- PHYSIK RECHNER PLAYER ---
-            if (keys.w || keys.ArrowUp) { if (speed < maxSpeed) speed += accel; }
-            else if (keys.s || keys.ArrowDown) { if (speed > -maxSpeed/2) speed -= accel; }
-            else {
+            // --- STEUERUNG & PHYSIK RECHNER ---
+            if (keys.w || keys.ArrowUp) { 
+                if (speed < maxSpeed) speed += accel; 
+            } else if (keys.s || keys.ArrowDown) { 
+                if (speed > -maxSpeed/2) speed -= accel; 
+            } else {
                 if (speed > 0) speed -= friction;
                 else if (speed < 0) speed += friction;
                 if (Math.abs(speed) < friction) speed = 0;
@@ -360,20 +338,20 @@ game_html = """
 
             playerCar.rotation.y = angle;
 
-            // --- ACHSENGETRENNTE KOLLISION (Verhindert das Feststecken komplett) ---
+            // --- SEPARATE ACHSEN-KOLLISION (Verhindert Feststecken) ---
             const origX = playerCar.position.x;
             const origZ = playerCar.position.z;
 
-            // 1. Bewege nur X-Achse
+            // X-Achsen-Bewegung prüfen
             playerCar.position.x += Math.sin(angle) * speed;
             playerBox.setFromObject(pBody);
             let collidedX = false;
             for (let i = 0; i < collisionObstacles.length; i++) {
                 if (playerBox.intersectsBox(collisionObstacles[i].box)) { collidedX = true; break; }
             }
-            if (collidedX) { playerCar.position.x = origX; speed *= -0.25; } // Prallt ab, gleitet aber weiter
+            if (collidedX) { playerCar.position.x = origX; speed *= -0.25; }
 
-            // 2. Bewege nur Z-Achse
+            // Z-Achsen-Bewegung prüfen
             playerCar.position.z += Math.cos(angle) * speed;
             playerBox.setFromObject(pBody);
             let collidedZ = false;
@@ -382,7 +360,7 @@ game_html = """
             }
             if (collidedZ) { playerCar.position.z = origZ; speed *= -0.25; }
 
-            // --- POLIZEI VERFOLGUNGS-KI ---
+            // --- KI POLIZEI ---
             const deltaX = playerCar.position.x - policeCar.position.x;
             const deltaZ = playerCar.position.z - policeCar.position.z;
             const polAngle = Math.atan2(deltaX, deltaZ);
@@ -393,10 +371,8 @@ game_html = """
             policeCar.position.z += Math.cos(polAngle) * currentPoliceSpeed;
             policeBox.setFromObject(polBody);
 
-            // Blaulicht Effekt
             blaulicht.material.color.setHex(Math.floor(Date.now() / 120) % 2 === 0 ? 0x0000ff : 0xff0000);
 
-            // Busted-Bedingung
             if (playerBox.intersectsBox(policeBox)) {
                 gameActive = false;
                 document.getElementById('status-text').innerText = "💥 BUSTED / GAME OVER";
@@ -404,7 +380,7 @@ game_html = """
                 document.getElementById('game-status').style.display = "block";
             }
 
-            // --- NPC VERKEHRS-MANAGEMENT (Fahren koordiniert ohne Durchdringen) ---
+            // --- KI ZIVIL-VERKEHR ---
             npcTraffic.forEach((npc, idx) => {
                 const npcOrigX = npc.group.position.x;
                 const npcOrigZ = npc.group.position.z;
@@ -416,33 +392,27 @@ game_html = """
 
                 let isBlocked = false;
 
-                // Prüfe Kollision gegen alle anderen Zivil-Autos
                 for (let j = 0; j < npcTraffic.length; j++) {
                     if (idx !== j && npc.box.intersectsBox(npcTraffic[j].box)) { isBlocked = true; break; }
                 }
-                
-                // Prüfe Kollision gegen Gebäude
                 for (let k = 0; k < collisionObstacles.length; k++) {
                     if (npc.box.intersectsBox(collisionObstacles[k].box)) { isBlocked = true; break; }
                 }
 
-                // Spielfeldrand-Check oder Blockade -> Umkehren
                 if (isBlocked || Math.abs(npc.group.position.x) > mapSize/2 || Math.abs(npc.group.position.z) > mapSize/2) {
                     npc.group.position.set(npcOrigX, 0.2, npcOrigZ);
                     npc.dir *= -1; 
                 }
 
-                // Wenn Spieler den NPC rammt
                 if (playerBox.intersectsBox(npc.box)) {
                     playerCar.position.set(origX, 0.2, origZ);
                     speed = -speed * 0.35;
                 }
             });
 
-            // --- UI UPDATE & INTERPOLIERTE KAMERA ---
+            // --- UI & KAMERA VERFOLGUNG ---
             document.getElementById('speed-val').innerText = Math.round(Math.abs(speed) * 115);
 
-            // Kamera-Federung hinter dem Spieler hergezogen
             const wishCamX = playerCar.position.x - Math.sin(angle) * 16;
             const wishCamZ = playerCar.position.z - Math.cos(angle) * 16;
             const wishCamY = playerCar.position.y + 6.5;
@@ -455,7 +425,6 @@ game_html = """
             renderer.render(scene, camera);
         }
 
-        // Window Resize Handler
         window.addEventListener('resize', () => {
             camera.aspect = container.clientWidth / container.clientHeight;
             camera.updateProjectionMatrix();
