@@ -9,7 +9,7 @@ st.set_page_config(
 )
 
 st.title("🏙️ 3D City Escape Simulator (Steuerung Fix)")
-st.write("Klicke in das Spielfeld. Steuerung mit **WASD / Pfeiltasten**. Überlebe 5 Minuten vor der Polizei! Drücke **R** für einen manuellen Reset.")
+st.write("👉 **WICHTIG:** Klicke zuerst einmal mitten in das Spielfeld, damit die Tastatur reagiert! Steuerung mit **WASD** oder **Pfeiltasten**.")
 
 game_html = """
 <!DOCTYPE html>
@@ -19,7 +19,7 @@ game_html = """
     <title>3D City Escape Pro</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #bae6fd; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; user-select: none; }
-        #canvas-container { width: 100vw; height: 75vh; position: relative; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.4); background-color: #a5f3fc; }
+        #canvas-container { width: 100vw; height: 75vh; position: relative; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.4); background-color: #a5f3fc; cursor: pointer; }
         #ui-layer {
             position: absolute; bottom: 25px; left: 25px; color: #0f172a;
             background: rgba(255, 255, 255, 0.95); padding: 15px 25px; border-radius: 12px;
@@ -46,13 +46,21 @@ game_html = """
             box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3); transition: background 0.2s;
         }
         #reset-btn:hover { background: #1d4ed8; }
+        #focus-warning {
+            position: absolute; top: 80px; left: 50%; transform: translateX(-50%);
+            background: rgba(234, 179, 8, 0.95); color: #0f172a; padding: 10px 20px;
+            border-radius: 8px; font-weight: bold; font-size: 14px; animation: pulse 1.5s infinite;
+            pointer-events: none; border: 1px solid #ca8a04;
+        }
+        @keyframes pulse { 0% { opacity: 0.8; } 50% { opacity: 1; } 100% { opacity: 0.8; } }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
 
-    <div id="canvas-container" onclick="window.focus();">
+    <div id="canvas-container">
         <button id="reset-btn" onclick="resetGame(); event.stopPropagation();">🔄 Spiel Neustarten (R)</button>
+        <div id="focus-warning">⚠️ KLICKE HIER REIN ZUM STEUERN!</div>
         <div id="game-status">
             <span id="status-text">GAME OVER</span><br>
             <span style="font-size:18px; color:#94a3b8; font-weight:normal; display:block; margin-top:10px;">Klicke den Button oben oder drücke R zum Wiederholen</span>
@@ -277,16 +285,36 @@ game_html = """
         }
 
         // ==========================================
-        // 5. INPUTS & STEUERUNGS-ENGINE (FIXED)
+        // 5. INPUTS & STEUERUNGS-ENGINE (STABILISIERT)
         // ==========================================
         let speed = 0, maxSpeed = 2.5, accel = 0.055, friction = 0.025, angle = 0, turnSpeed = 0.048;
         const keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
 
-        window.addEventListener('keydown', (e) => {
-            if (e.key in keys) { keys[e.key] = true; e.preventDefault(); }
-            if (e.key.toLowerCase() === 'r') resetGame();
+        // Fokus-Event-Handler
+        container.addEventListener('click', () => {
+            window.focus();
+            document.getElementById('focus-warning').style.display = 'none';
         });
-        window.addEventListener('keyup', (e) => { if (e.key in keys) keys[e.key] = false; });
+
+        window.addEventListener('keydown', (e) => {
+            const k = e.key.toLowerCase();
+            if (e.key in keys || k === 'w' || k === 'a' || k === 's' || k === 'd') {
+                if (k === 'w' || e.key === 'ArrowUp') keys.w = true;
+                if (k === 'a' || e.key === 'ArrowLeft') keys.a = true;
+                if (k === 's' || e.key === 'ArrowDown') keys.s = true;
+                if (k === 'd' || e.key === 'ArrowRight') keys.d = true;
+                e.preventDefault();
+            }
+            if (k === 'r') resetGame();
+        });
+
+        window.addEventListener('keyup', (e) => {
+            const k = e.key.toLowerCase();
+            if (k === 'w' || e.key === 'ArrowUp') keys.w = false;
+            if (k === 'a' || e.key === 'ArrowLeft') keys.a = false;
+            if (k === 's' || e.key === 'ArrowDown') keys.s = false;
+            if (k === 'd' || e.key === 'ArrowRight') keys.d = false;
+        });
 
         const timerInterval = setInterval(() => {
             if (!gameActive) return;
@@ -310,6 +338,8 @@ game_html = """
             speed = 0; angle = 0; timeLeft = 300;
             gameActive = true;
             document.getElementById('game-status').style.display = "none";
+            document.getElementById('focus-warning').style.display = 'none';
+            window.focus();
         }
 
         // ==========================================
@@ -320,9 +350,9 @@ game_html = """
             if (!gameActive) return;
 
             // --- STEUERUNG & PHYSIK RECHNER ---
-            if (keys.w || keys.ArrowUp) { 
+            if (keys.w) { 
                 if (speed < maxSpeed) speed += accel; 
-            } else if (keys.s || keys.ArrowDown) { 
+            } else if (keys.s) { 
                 if (speed > -maxSpeed/2) speed -= accel; 
             } else {
                 if (speed > 0) speed -= friction;
@@ -332,17 +362,16 @@ game_html = """
 
             if (Math.abs(speed) > 0.05) {
                 const dirMod = speed > 0 ? 1 : -1;
-                if (keys.a || keys.ArrowLeft) angle += turnSpeed * dirMod;
-                if (keys.d || keys.ArrowRight) angle -= turnSpeed * dirMod;
+                if (keys.a) angle += turnSpeed * dirMod;
+                if (keys.d) angle -= turnSpeed * dirMod;
             }
 
             playerCar.rotation.y = angle;
 
-            // --- SEPARATE ACHSEN-KOLLISION (Verhindert Feststecken) ---
+            // --- SEPARATE ACHSEN-KOLLISION ---
             const origX = playerCar.position.x;
             const origZ = playerCar.position.z;
 
-            // X-Achsen-Bewegung prüfen
             playerCar.position.x += Math.sin(angle) * speed;
             playerBox.setFromObject(pBody);
             let collidedX = false;
@@ -351,7 +380,6 @@ game_html = """
             }
             if (collidedX) { playerCar.position.x = origX; speed *= -0.25; }
 
-            // Z-Achsen-Bewegung prüfen
             playerCar.position.z += Math.cos(angle) * speed;
             playerBox.setFromObject(pBody);
             let collidedZ = false;
