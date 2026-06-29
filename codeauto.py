@@ -1,7 +1,6 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-# Seiten-Konfiguration für das perfekte Vollbild-Erlebnis
 st.set_page_config(
     page_title="3D Open World City Driver",
     page_icon="🚗",
@@ -9,295 +8,164 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# UI Styling für Streamlit
 st.markdown("""
     <style>
-    .reportview-container .main .block-container {
-        padding-top: 1rem;
-        padding-bottom: 1rem;
-    }
-    h1 {
-        color: #38bdf8 !important;
-        font-family: 'Helvetica Neue', Arial, sans-serif;
-        font-weight: 800;
-        margin-bottom: 5px;
-    }
-    .stMarkdown p {
-        color: #94a3b8;
-    }
+    .reportview-container .main .block-container { padding-top: 1rem; padding-bottom: 1rem; }
+    h1 { color: #38bdf8 !important; font-family: sans-serif; font-weight: 800; margin-bottom: 5px; }
+    .stMarkdown p { color: #94a3b8; }
     </style>
 """, unsafe_allow_html=True)
 
 st.title("🚗 3D Open World City Driver")
-st.write("Erkunde die 3D-Metropole direkt im Browser. Steuere das Auto mit den Pfeiltasten oder WASD.")
+st.write("KLICKE EINMAL IN DAS SPIELFELD, um die Steuerung zu aktivieren! Nutze dann WASD oder die Pfeiltasten.")
 
-# Das komplette HTML- und JavaScript-Paket (Three.js 3D-Engine)
+# Optimierter HTML-Code mit Auto-Fokus
 game_html = """
 <!DOCTYPE html>
 <html lang="de">
 <head>
     <meta charset="UTF-8">
     <style>
-        body { margin: 0; overflow: hidden; background-color: #0b0f19; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        #canvas-container { width: 100vw; height: 70vh; position: relative; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.5); }
+        body { margin: 0; overflow: hidden; background-color: #0b0f19; font-family: sans-serif; }
+        #canvas-container { width: 100vw; height: 70vh; position: relative; border-radius: 12px; overflow: hidden; cursor: pointer; }
         #ui-layer {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-            color: #38bdf8;
-            background: rgba(15, 23, 42, 0.85);
-            padding: 15px 25px;
-            border-radius: 10px;
-            font-size: 24px;
-            font-weight: bold;
-            border: 2px solid #1e293b;
-            pointer-events: none;
-            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.3);
+            position: absolute; bottom: 20px; left: 20px; color: #38bdf8;
+            background: rgba(15, 23, 42, 0.85); padding: 15px 25px; border-radius: 10px;
+            font-size: 24px; font-weight: bold; border: 2px solid #1e293b; pointer-events: none;
         }
         #ui-layer span { color: #f43f5e; }
         #controls-hint {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            color: #94a3b8;
-            background: rgba(15, 23, 42, 0.85);
-            padding: 10px 15px;
-            border-radius: 8px;
-            font-size: 12px;
-            border: 1px solid #1e293b;
-            pointer-events: none;
+            position: absolute; top: 20px; right: 20px; color: #94a3b8;
+            background: rgba(15, 23, 42, 0.85); padding: 10px 15px; border-radius: 8px;
+            font-size: 13px; border: 1px solid #1e293b; pointer-events: none;
         }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
 
-    <div id="canvas-container">
+    <div id="canvas-container" onclick="window.focus();">
         <div id="ui-layer"><span id="speed-val">0</span> KM/H</div>
-        <div id="controls-hint">Steuerung: <b>WASD</b> oder <b>Pfeiltasten</b></div>
+        <div id="controls-hint">👉 <b>Hier klicken zum Aktivieren</b><br>Steuerung: WASD / Pfeiltasten</div>
     </div>
 
     <script>
-        // --- 1. GAME SETUP ---
+        // --- 1. SETUP ---
         const container = document.getElementById('canvas-container');
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x0b0f19);
-        scene.fog = new THREE.FogExp2(0x0b0f19, 0.012); // Realistischer Dunst in der Ferne
+        scene.fog = new THREE.FogExp2(0x0b0f19, 0.015);
 
         const camera = new THREE.PerspectiveCamera(65, container.clientWidth / container.clientHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(container.clientWidth, container.clientHeight);
         renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         container.appendChild(renderer.domElement);
 
-        // --- 2. BELEUCHTUNG (Atmosphärisches Nachtdesign) ---
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
-        scene.add(ambientLight);
+        // --- 2. LIGHTS ---
+        scene.add(new THREE.AmbientLight(0xffffff, 0.3));
+        const light = new THREE.DirectionalLight(0x38bdf8, 0.8);
+        light.position.set(50, 150, 50);
+        scene.add(light);
 
-        const moonlight = new THREE.DirectionalLight(0x38bdf8, 0.6);
-        moonlight.position.set(100, 200, 50);
-        moonlight.castShadow = true;
-        moonlight.shadow.mapSize.width = 2048;
-        moonlight.shadow.mapSize.height = 2048;
-        scene.add(moonlight);
-
-        // --- 3. DIE OPEN-WORLD MAP ---
-        const mapSize = 600;
-        
-        // Boden (Asphalt)
-        const groundGeo = new THREE.PlaneGeometry(mapSize, mapSize);
-        const groundMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.8, metalness: 0.1 });
-        const ground = new THREE.Mesh(groundGeo, groundMat);
+        // --- 3. MAP (Stadt) ---
+        const mapSize = 500;
+        const ground = new THREE.Mesh(
+            new THREE.PlaneGeometry(mapSize, mapSize),
+            new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.8 })
+        );
         ground.rotation.x = -Math.PI / 2;
-        ground.receiveShadow = true;
         scene.add(ground);
 
-        // Straßenmarkierungen (Raster)
-        const gridHelper = new THREE.GridHelper(mapSize, 30, 0x38bdf8, 0x1e293b);
-        gridHelper.position.y = 0.01;
-        scene.add(gridHelper);
+        // Grid für Sichtbarkeit bei Nacht
+        const grid = new THREE.GridHelper(mapSize, 40, 0x38bdf8, 0x1e293b);
+        grid.position.y = 0.01;
+        scene.add(grid);
 
-        // Prozedurale Riesenstadt generieren
+        // Gebäude
         const buildingGroup = new THREE.Group();
-        const boxGeo = new THREE.BoxGeometry(1, 1, 1);
-        
         for (let x = -mapSize/2; x < mapSize/2; x += 30) {
             for (let z = -mapSize/2; z < mapSize/2; z += 30) {
-                // Startzone freihalten
-                if (Math.abs(x) < 25 && Math.abs(z) < 25) continue;
-                
-                if (Math.random() > 0.3) {
-                    const h = 20 + Math.random() * 70; // Zufällige Wolkenkratzer-Höhen
-                    const w = 12 + Math.random() * 10;
-                    const d = 12 + Math.random() * 10;
-                    
-                    // Cyberpunk/Neon-Farbpalette für die Gebäude
-                    const hue = 0.55 + Math.random() * 0.15; // Blau bis Violett
-                    const buildMat = new THREE.MeshStandardMaterial({ 
-                        color: new THREE.Color().setHSL(hue, 0.7, 0.2),
-                        roughness: 0.2,
-                        metalness: 0.5
-                    });
-                    
-                    const building = new THREE.Mesh(boxGeo, buildMat);
-                    building.scale.set(w, h, d);
-                    building.position.set(x + (Math.random()-0.5)*5, h / 2, z + (Math.random()-0.5)*5);
-                    building.castShadow = true;
-                    building.receiveShadow = true;
-                    buildingGroup.add(building);
+                if (Math.abs(x) < 20 && Math.abs(z) < 20) continue;
+                if (Math.random() > 0.4) {
+                    const h = 15 + Math.random() * 50;
+                    const b = new THREE.Mesh(
+                        new THREE.BoxGeometry(12, h, 12),
+                        new THREE.MeshStandardMaterial({ color: new THREE.Color().setHSL(0.6, 0.6, 0.2), roughness: 0.5 })
+                    );
+                    b.position.set(x, h/2, z);
+                    buildingGroup.add(b);
                 }
             }
         }
         scene.add(buildingGroup);
 
-        // --- 4. DAS 3D-AUTO ---
+        // --- 4. AUTO ---
         const car = new THREE.Group();
-        
-        // Chassis (Hauptkörper)
-        const bodyMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.1, metalness: 0.8 });
-        const bodyGeo = new THREE.BoxGeometry(2, 0.6, 4.2);
-        const carBody = new THREE.Mesh(bodyGeo, bodyMat);
+        const carBody = new THREE.Mesh(new THREE.BoxGeometry(2, 0.6, 4), new THREE.MeshStandardMaterial({ color: 0x3b82f6 }));
         carBody.position.y = 0.5;
-        carBody.castShadow = true;
-        carBody.receiveShadow = true;
         car.add(carBody);
-
-        // Dach / Cockpit
-        const cabGeo = new THREE.BoxGeometry(1.6, 0.5, 2.2);
-        const cabMat = new THREE.MeshStandardMaterial({ color: 0x030712, roughness: 0.1 });
-        const carCab = new THREE.Mesh(cabGeo, cabMat);
-        carCab.position.set(0, 1.0, -0.2);
-        carCab.castShadow = true;
-        car.add(carCab);
-
-        // Scheinwerfer (Vorne)
-        const lightGeo = new THREE.BoxGeometry(0.3, 0.1, 0.1);
-        const frontLightMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-        const leftLight = new THREE.Mesh(lightGeo, frontLightMat); leftLight.position.set(-0.8, 0.5, 2.1); car.add(leftLight);
-        const rightLight = new THREE.Mesh(lightGeo, frontLightMat); rightLight.position.set(0.8, 0.5, 2.1); car.add(rightLight);
-
-        // Rückleuchten / Bremslichter
-        const brakeLightMat = new THREE.MeshStandardMaterial({ color: 0x991b1b, emissive: 0x000000 });
-        const leftBrake = new THREE.Mesh(lightGeo, brakeLightMat); leftBrake.position.set(-0.8, 0.5, -2.1); car.add(leftBrake);
-        const rightBrake = new THREE.Mesh(lightGeo, brakeLightMat); rightBrake.position.set(0.8, 0.5, -2.1); car.add(rightBrake);
-
-        // Räder
-        const wheelGeo = new THREE.CylinderGeometry(0.45, 0.45, 0.4, 24);
-        const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.9 });
-        wheelGeo.rotateZ(Math.PI / 2);
-
-        const wheelPositions = [[-1.05, 0.45, 1.3], [1.05, 0.45, 1.3], [-1.05, 0.45, -1.3], [1.05, 0.45, -1.3]];
-        const wheels = [];
-        wheelPositions.forEach(pos => {
-            const wheel = new THREE.Mesh(wheelGeo, wheelMat);
-            wheel.position.set(pos[0], pos[1], pos[2]);
-            wheel.castShadow = true;
-            car.add(wheel);
-            wheels.push(wheel);
-        });
+        
+        // Scheinwerfer
+        const sGeo = new THREE.BoxGeometry(0.2, 0.1, 0.1);
+        const sMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const s1 = new THREE.Mesh(sGeo, sMat); s1.position.set(-0.7, 0.5, 2); car.add(s1);
+        const s2 = new THREE.Mesh(sGeo, sMat); s2.position.set(0.7, 0.5, 2); car.add(s2);
         
         scene.add(car);
 
-        // --- 5. INTERAKTIVE PHYSIK-ENGINE ---
-        let speed = 0;
-        let maxSpeed = 1.4;
-        let accel = 0.025;
-        let friction = 0.012;
-        let brakePower = 0.05;
-        let turnSpeed = 0.035;
-        let angle = 0;
-
-        // Input-Abfrage
+        // --- 5. INTERNE STEUERUNG LOGIK ---
+        let speed = 0, maxSpeed = 1.5, accel = 0.03, friction = 0.015, angle = 0, turnSpeed = 0.04;
         const keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
-        window.addEventListener('keydown', (e) => { if (e.key in keys) keys[e.key] = true; });
+        
+        window.addEventListener('keydown', (e) => { 
+            if (e.key in keys) {
+                keys[e.key] = true;
+                e.preventDefault(); // Verhindert Scrollen des Browsers
+            }
+        });
         window.addEventListener('keyup', (e) => { if (e.key in keys) keys[e.key] = false; });
 
-        // --- 6. CORE GAME LOOP ---
+        // Auto-Fokus Versuch bei Mausbewegung über das Spiel
+        container.addEventListener('mouseenter', () => { window.focus(); });
+
+        // --- 6. GAME LOOP ---
         function animate() {
             requestAnimationFrame(animate);
 
-            // Beschleunigen & Bremsen Logik
-            if (keys.w || keys.ArrowUp) {
-                if (speed < maxSpeed) speed += accel;
-                brakeLightMat.emissive.setHex(0x000000); // Bremslichter aus
-            } else if (keys.s || keys.ArrowDown) {
-                if (speed > 0) {
-                    speed -= brakePower; // Starkes Bremsen
-                    brakeLightMat.emissive.setHex(0xff0000); // Bremslichter leuchten rot!
-                } else if (speed > -maxSpeed / 2) {
-                    speed -= accel; // Rückwärtsgang
-                    brakeLightMat.emissive.setHex(0xaaaaaa); // Weißes Rückfahrlicht-Imitat
-                }
-            } else {
-                // Physikalisches Ausrollen durch Reibung
+            if (keys.w || keys.ArrowUp) { if (speed < maxSpeed) speed += accel; }
+            else if (keys.s || keys.ArrowDown) { if (speed > -maxSpeed/2) speed -= accel; }
+            else {
                 if (speed > 0) speed -= friction;
                 else if (speed < 0) speed += friction;
                 if (Math.abs(speed) < friction) speed = 0;
-                brakeLightMat.emissive.setHex(0x000000);
             }
 
-            // Realistische Lenkung (nur während der Fahrt möglich)
             if (Math.abs(speed) > 0.05) {
-                const directionFactor = speed > 0 ? 1 : -1;
-                if (keys.a || keys.ArrowLeft) {
-                    angle += turnSpeed * directionFactor * (1.2 - Math.abs(speed)/maxSpeed*0.4);
-                    wheels[0].rotation.y = 0.4; wheels[1].rotation.y = 0.4; // Rad-Einschlag visuell
-                } else if (keys.d || keys.ArrowRight) {
-                    angle -= turnSpeed * directionFactor * (1.2 - Math.abs(speed)/maxSpeed*0.4);
-                    wheels[0].rotation.y = -0.4; wheels[1].rotation.y = -0.4;
-                } else {
-                    wheels[0].rotation.y = 0; wheels[1].rotation.y = 0;
-                }
+                const dir = speed > 0 ? 1 : -1;
+                if (keys.a || keys.ArrowLeft) angle += turnSpeed * dir;
+                if (keys.d || keys.ArrowRight) angle -= turnSpeed * dir;
             }
 
-            // Räder rotieren lassen basierend auf Geschwindigkeit
-            wheels.forEach(w => w.rotation.x += speed * 0.5);
-
-            // Auto-Ausrichtung updaten
             car.rotation.y = angle;
             car.position.x += Math.sin(angle) * speed;
             car.position.z += Math.cos(angle) * speed;
 
-            // Tacho auf dem UI-Layer aktualisieren
-            document.getElementById('speed-val').innerText = Math.round(Math.abs(speed) * 120);
+            document.getElementById('speed-val').innerText = Math.round(Math.abs(speed) * 100);
 
-            // Dynamic Camera Tracking (Verzögertes Hinterherziehen für Geschwindigkeitsgefühl)
-            const targetCamX = car.position.x - Math.sin(angle) * 13;
-            const targetCamZ = car.position.z - Math.cos(angle) * 13;
-            const targetCamY = car.position.y + 4.8;
-
-            camera.position.x += (targetCamX - camera.position.x) * 0.08;
-            camera.position.y += (targetCamY - camera.position.y) * 0.08;
-            camera.position.z += (targetCamZ - camera.position.z) * 0.08;
-            
-            // Fokuspunkt der Kamera liegt immer kurz vor dem Auto
-            camera.lookAt(car.position.x + Math.sin(angle)*2, car.position.y + 0.8, car.position.z + Math.cos(angle)*2);
+            // Kamera-Verfolgung
+            camera.position.x += (car.position.x - Math.sin(angle) * 12 - camera.position.x) * 0.1;
+            camera.position.y += (car.position.y + 4.5 - camera.position.y) * 0.1;
+            camera.position.z += (car.position.z - Math.cos(angle) * 12 - camera.position.z) * 0.1;
+            camera.lookAt(car.position.x, car.position.y + 1, car.position.z);
 
             renderer.render(scene, camera);
         }
 
-        // Responsivität bei Größenänderung des Streamlit-Fensters
-        window.addEventListener('resize', () => {
-            camera.aspect = container.clientWidth / container.clientHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(container.clientWidth, container.clientHeight);
-        });
-
-        // Spiel starten
         animate();
     </script>
 </body>
 </html>
 """
 
-# Rendert das Spiel direkt nativ im Streamlit UI
 components.html(game_html, height=620, scrolling=False)
-
-st.markdown("""
----
-### 🛠️ Open-World Tech Stack
-* **Rendering:** WebGL über **Three.js** (vollständige GPU-Hardwarebeschleunigung).
-* **Framework:** **Streamlit** (Python) fungiert als Webserver und Wrapper.
-* **Hosting-Tipp:** Pushe diese Datei einfach in dein GitHub-Repository und schalte sie kostenlos über die *Streamlit Community Cloud* live.
-""")
