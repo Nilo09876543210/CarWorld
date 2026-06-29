@@ -9,7 +9,7 @@ st.set_page_config(
 )
 
 st.title("🏙️ 3D City Escape Simulator (Steuerung Fix)")
-st.write("👉 **WICHTIG:** Klicke zuerst einmal mitten in das Spielfeld, damit die Tastatur reagiert! Steuerung mit **WASD** oder **Pfeiltasten**.")
+st.write("👉 **HINWEIS:** Klicke einmal mitten in das Spiel, um loszufahren. Tasten: **WASD** oder **Pfeiltasten**.")
 
 game_html = """
 <!DOCTYPE html>
@@ -24,35 +24,30 @@ game_html = """
             position: absolute; bottom: 25px; left: 25px; color: #0f172a;
             background: rgba(255, 255, 255, 0.95); padding: 15px 25px; border-radius: 12px;
             font-size: 24px; font-weight: bold; border: 2px solid #cbd5e1; pointer-events: none;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
         }
         #ui-layer span { color: #dc2626; }
         #timer-layer {
             position: absolute; top: 25px; right: 25px; color: #ffffff;
             background: rgba(15, 23, 42, 0.95); padding: 12px 25px; border-radius: 12px;
             font-size: 28px; font-weight: bold; border: 2px solid #3b82f6; pointer-events: none;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         }
         #game-status {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
             color: #ffffff; background: rgba(15, 23, 42, 0.95); padding: 40px 60px; border-radius: 16px;
             font-size: 42px; font-weight: bold; text-align: center; display: none; z-index: 100;
-            border: 3px solid #dc2626; box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            border: 3px solid #dc2626;
         }
         #reset-btn {
             position: absolute; top: 25px; left: 25px; color: #ffffff;
             background: #2563eb; padding: 12px 24px; border-radius: 8px;
             font-size: 15px; font-weight: bold; border: none; cursor: pointer; z-index: 10;
-            box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3); transition: background 0.2s;
         }
-        #reset-btn:hover { background: #1d4ed8; }
         #focus-warning {
-            position: absolute; top: 80px; left: 50%; transform: translateX(-50%);
-            background: rgba(234, 179, 8, 0.95); color: #0f172a; padding: 10px 20px;
-            border-radius: 8px; font-weight: bold; font-size: 14px; animation: pulse 1.5s infinite;
-            pointer-events: none; border: 1px solid #ca8a04;
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(234, 179, 8, 0.95); color: #0f172a; padding: 20px 40px;
+            border-radius: 12px; font-weight: bold; font-size: 20px; border: 2px solid #ca8a04;
+            text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2);
         }
-        @keyframes pulse { 0% { opacity: 0.8; } 50% { opacity: 1; } 100% { opacity: 0.8; } }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
@@ -60,10 +55,10 @@ game_html = """
 
     <div id="canvas-container">
         <button id="reset-btn" onclick="resetGame(); event.stopPropagation();">🔄 Spiel Neustarten (R)</button>
-        <div id="focus-warning">⚠️ KLICKE HIER REIN ZUM STEUERN!</div>
+        <div id="focus-warning">⚠️ BITTE HIER REINKLICKEN ZUM FAHREN!</div>
         <div id="game-status">
             <span id="status-text">GAME OVER</span><br>
-            <span style="font-size:18px; color:#94a3b8; font-weight:normal; display:block; margin-top:10px;">Klicke den Button oben oder drücke R zum Wiederholen</span>
+            <span style="font-size:18px; color:#94a3b8; font-weight:normal; display:block; margin-top:10px;">Drücke R zum Wiederholen</span>
         </div>
         <div id="ui-layer"><span id="speed-val">0</span> KM/H</div>
         <div id="timer-layer">⏱️ <span id="time-val">05:00</span></div>
@@ -71,7 +66,7 @@ game_html = """
 
     <script>
         // ==========================================
-        // 1. ENGINE CONFIG & CORE SETUP
+        // 1. ENGINE SETUP
         // ==========================================
         const container = document.getElementById('canvas-container');
         const scene = new THREE.Scene();
@@ -79,26 +74,18 @@ game_html = """
         scene.fog = new THREE.FogExp2(0xa5f3fc, 0.0035);
 
         const camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 2000);
-        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(container.clientWidth, container.clientHeight);
         renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         container.appendChild(renderer.domElement);
 
-        // BELEUCHTUNG
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
-        scene.add(ambientLight);
-
+        scene.add(new THREE.AmbientLight(0xffffff, 0.75));
         const sun = new THREE.DirectionalLight(0xfffbeb, 1.3);
         sun.position.set(300, 500, 200);
         sun.castShadow = true;
-        sun.shadow.mapSize.width = 2048;
-        sun.shadow.mapSize.height = 2048;
         scene.add(sun);
 
-        // ==========================================
-        // 2. SPIELVARIABLEN & GLOBALE ARRAYS
-        // ==========================================
+        // VARIABLEN
         const mapSize = 1200;
         const blockSize = 90;
         const roadWidth = 24;
@@ -115,215 +102,118 @@ game_html = """
         const cylGeo = new THREE.CylinderGeometry(1, 1, 1, 16);
 
         // GROUND
-        const groundMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.9 });
-        const ground = new THREE.Mesh(new THREE.PlaneGeometry(mapSize, mapSize), groundMat);
+        const ground = new THREE.Mesh(new THREE.PlaneGeometry(mapSize, mapSize), new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.9 }));
         ground.rotation.x = -Math.PI / 2;
         ground.receiveShadow = true;
         scene.add(ground);
 
-        // ==========================================
-        // 3. PROZEDURALER STADTGENERATOR
-        // ==========================================
+        // STADT GENERIEREN
         for (let x = -mapSize/2; x < mapSize/2; x += blockSize) {
             for (let z = -mapSize/2; z < mapSize/2; z += blockSize) {
-                createAdvancedRoads(x, z, blockSize);
+                createRoads(x, z, blockSize);
                 
-                if (Math.abs(x) < blockSize && Math.abs(z) < blockSize) {
-                    createDecorativeTrees(x, z);
-                    continue;
-                }
+                if (Math.abs(x) < blockSize && Math.abs(z) < blockSize) continue;
 
                 const innerW = blockSize - roadWidth;
-                const swMat = new THREE.MeshStandardMaterial({ color: 0x71717a, roughness: 0.7 });
-                const sw = new THREE.Mesh(boxGeo, swMat);
+                const sw = new THREE.Mesh(boxGeo, new THREE.MeshStandardMaterial({ color: 0x71717a }));
                 sw.scale.set(innerW, 0.4, innerW);
                 sw.position.set(x + roadWidth/2 + innerW/2, 0.2, z + roadWidth/2 + innerW/2);
-                sw.receiveShadow = true;
                 scene.add(sw);
 
                 if (Math.random() > 0.15) {
-                    createProBuilding(x, z, innerW);
-                } else {
-                    createDecorativeTrees(x, z);
+                    createBuilding(x, z, innerW);
                 }
             }
         }
 
-        function createAdvancedRoads(x, z, size) {
-            const rMat = new THREE.MeshStandardMaterial({ color: 0x1e1b4b, roughness: 0.85 });
-            const road = new THREE.Mesh(planeGeo, rMat);
-            road.scale.set(size, size, 1);
-            road.rotation.x = -Math.PI / 2;
+        function createRoads(x, z, size) {
+            const road = new THREE.Mesh(planeGeo, new THREE.MeshStandardMaterial({ color: 0x1e1b4b, roughness: 0.85 }));
+            road.scale.set(size, size, 1); road.rotation.x = -Math.PI / 2;
             road.position.set(x + size/2, 0.02, z + size/2);
-            road.receiveShadow = true;
             scene.add(road);
 
-            const lineMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-            const mLine = new THREE.Mesh(planeGeo, lineMat);
+            const mLine = new THREE.Mesh(planeGeo, new THREE.MeshBasicMaterial({ color: 0xffffff }));
             mLine.scale.set(0.2, size, 1); mLine.rotation.x = -Math.PI / 2;
             mLine.position.set(x + size/2, 0.03, z + size/2);
             scene.add(mLine);
         }
 
-        function createProBuilding(x, z, innerW) {
+        function createBuilding(x, z, innerW) {
             const h = 40 + Math.random() * 80;
             const buildW = innerW - sidewalkW * 2;
-            
-            const buildingColors = [0x3f3f46, 0x52525b, 0x18181b, 0x27272a, 0x5b5151];
-            const chosenColor = buildingColors[Math.floor(Math.random() * buildingColors.length)];
-
-            const bGroup = new THREE.Group();
-            const body = new THREE.Mesh(boxGeo, new THREE.MeshStandardMaterial({ color: chosenColor, roughness: 0.4, metalness: 0.1 }));
-            body.scale.set(buildW, h, buildW);
-            body.position.y = h / 2;
-            body.castShadow = true;
-            body.receiveShadow = true;
-            bGroup.add(body);
-
-            const roof = new THREE.Mesh(boxGeo, new THREE.MeshStandardMaterial({ color: 0x09090b }));
-            roof.scale.set(buildW + 1, 1.5, buildW + 1);
-            roof.position.y = h + 0.75;
-            bGroup.add(roof);
-
-            const winGeo = new THREE.PlaneGeometry(1.4, 2);
-            const winMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
-
-            for (let yHeight = 6; yHeight < h - 6; yHeight += 7) {
-                for (let xPos = -buildW/2 + 3; xPos < buildW/2 - 3; xPos += 5) {
-                    const wFace1 = new THREE.Mesh(winGeo, winMat);
-                    wFace1.position.set(xPos, yHeight, buildW/2 + 0.05);
-                    bGroup.add(wFace1);
-
-                    const wFace2 = new THREE.Mesh(winGeo, winMat);
-                    wFace2.position.set(xPos, yHeight, -buildW/2 - 0.05);
-                    wFace2.rotation.y = Math.PI;
-                    bGroup.add(wFace2);
-                }
-            }
-
-            bGroup.position.set(x + blockSize/2, 0.4, z + blockSize/2);
-            scene.add(bGroup);
-
-            const staticBox = new THREE.Box3().setFromObject(body);
-            collisionObstacles.push({ box: staticBox, mesh: body });
+            const body = new THREE.Mesh(boxGeo, new THREE.MeshStandardMaterial({ color: 0x3f3f46, roughness: 0.5 }));
+            body.scale.set(buildW, h, buildW); body.position.set(x + blockSize/2, h/2 + 0.2, z + blockSize/2);
+            body.castShadow = true; scene.add(body);
+            collisionObstacles.push({ box: new THREE.Box3().setFromObject(body) });
         }
 
-        function createDecorativeTrees(x, z) {
-            for (let i = 0; i < 3; i++) {
-                const tx = x + roadWidth + Math.random() * 20;
-                const tz = z + roadWidth + Math.random() * 20;
-                
-                const tree = new THREE.Group();
-                const trunk = new THREE.Mesh(cylGeo, new THREE.MeshStandardMaterial({ color: 0x451a03 }));
-                trunk.scale.set(0.5, 5, 0.5); trunk.position.y = 2.5; trunk.castShadow = true;
-                tree.add(trunk);
-
-                const crown = new THREE.Mesh(boxGeo, new THREE.MeshStandardMaterial({ color: 0x065f46, roughness: 0.6 }));
-                crown.scale.set(3, 4, 3); crown.position.y = 5.5; crown.castShadow = true;
-                tree.add(crown);
-
-                tree.position.set(tx, 0.4, tz);
-                scene.add(tree);
-                
-                collisionObstacles.push({ box: new THREE.Box3().setFromObject(trunk), mesh: trunk });
-            }
-        }
-
-        // ==========================================
-        // 4. ENTITIES: SPIELER, POLIZEI & TRAFFIC
-        // ==========================================
+        // FAHRZEUGE
         const playerCar = new THREE.Group();
-        const pBody = new THREE.Mesh(boxGeo, new THREE.MeshStandardMaterial({ color: 0xdc2626, metalness: 0.8, roughness: 0.1 }));
-        pBody.scale.set(2.4, 0.65, 4.6); pBody.position.y = 0.5; pBody.castShadow = true;
-        playerCar.add(pBody);
-        
-        const pCab = new THREE.Mesh(boxGeo, new THREE.MeshStandardMaterial({ color: 0x0f172a }));
-        pCab.scale.set(1.8, 0.55, 2.2); pCab.position.set(0, 1.05, -0.2);
-        playerCar.add(pCab);
-
-        playerCar.position.set(8, 0.2, 8);
-        scene.add(playerCar);
+        const pBody = new THREE.Mesh(boxGeo, new THREE.MeshStandardMaterial({ color: 0xdc2626, metalness: 0.6 }));
+        pBody.scale.set(2.4, 0.7, 4.6); pBody.position.y = 0.5; playerCar.add(pBody);
+        playerCar.position.set(8, 0.2, 8); scene.add(playerCar);
         const playerBox = new THREE.Box3();
 
         const policeCar = new THREE.Group();
-        const polBody = new THREE.Mesh(boxGeo, new THREE.MeshStandardMaterial({ color: 0x1d4ed8, metalness: 0.5, roughness: 0.2 }));
-        polBody.scale.set(2.4, 0.7, 4.6); polBody.position.y = 0.5; polBody.castShadow = true;
-        policeCar.add(polBody);
-
-        const polCab = new THREE.Mesh(boxGeo, new THREE.MeshStandardMaterial({ color: 0xf8fafc }));
-        polCab.scale.set(1.8, 0.55, 2.2); polCab.position.set(0, 1.1, -0.1);
-        policeCar.add(polCab);
-
+        const polBody = new THREE.Mesh(boxGeo, new THREE.MeshStandardMaterial({ color: 0x1d4ed8 }));
+        polBody.scale.set(2.4, 0.7, 4.6); polBody.position.y = 0.5; policeCar.add(polBody);
         const blaulicht = new THREE.Mesh(boxGeo, new THREE.MeshBasicMaterial({ color: 0x0000ff }));
-        blaulicht.scale.set(0.8, 0.2, 0.4); blaulicht.position.set(0, 1.45, 0);
-        policeCar.add(blaulicht);
-
-        policeCar.position.set(-80, 0.2, -80);
-        scene.add(policeCar);
+        blaulicht.scale.set(0.8, 0.2, 0.4); blaulicht.position.set(0, 1.3, 0); policeCar.add(blaulicht);
+        policeCar.position.set(-60, 0.2, -60); scene.add(policeCar);
         const policeBox = new THREE.Box3();
 
-        const trafficColors = [0x059669, 0xd97706, 0x6d28d9, 0x4b5563, 0x0891b2];
+        // TRAFFIC
+        const trafficColors = [0x059669, 0xd97706, 0x6d28d9, 0x4b5563];
         function generateTraffic(startX, startZ, moveOnX) {
             const aiCar = new THREE.Group();
-            const aiBody = new THREE.Mesh(boxGeo, new THREE.MeshStandardMaterial({ color: trafficColors[Math.floor(Math.random() * trafficColors.length)], roughness: 0.3 }));
-            aiBody.scale.set(2.3, 0.7, 4.6); aiBody.position.y = 0.5; aiBody.castShadow = true;
-            aiCar.add(aiBody);
-
+            const aiBody = new THREE.Mesh(boxGeo, new THREE.MeshStandardMaterial({ color: trafficColors[Math.floor(Math.random()*4)] }));
+            aiBody.scale.set(2.3, 0.7, 4.6); aiBody.position.y = 0.5; aiCar.add(aiBody);
             aiCar.position.set(startX, 0.2, startZ);
             if (!moveOnX) aiCar.rotation.y = Math.PI / 2;
             scene.add(aiCar);
-
-            npcTraffic.push({
-                group: aiCar, mesh: aiBody, box: new THREE.Box3(), isX: moveOnX, speed: 0.35, dir: Math.random() > 0.5 ? 1 : -1
-            });
+            npcTraffic.push({ group: aiCar, mesh: aiBody, box: new THREE.Box3(), isX: moveOnX, speed: 0.35, dir: 1 });
         }
-
-        for (let i = -400; i < 400; i += 90) {
+        for (let i = -300; i < 300; i += 90) {
             generateTraffic(i, -14, true);
             generateTraffic(14, i, false);
-            generateTraffic(i + 30, 14, true);
         }
 
         // ==========================================
-        // 5. INPUTS & STEUERUNGS-ENGINE (STABILISIERT)
+        // STEUERUNGS CORE (ABSOLUT SEPARIERT FÜR FOKUS)
         // ==========================================
-        let speed = 0, maxSpeed = 2.5, accel = 0.055, friction = 0.025, angle = 0, turnSpeed = 0.048;
-        const keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
+        let speed = 0, maxSpeed = 2.5, accel = 0.06, friction = 0.025, angle = 0, turnSpeed = 0.05;
+        const keys = { w: false, a: false, s: false, d: false };
 
-        // Fokus-Event-Handler
-        container.addEventListener('click', () => {
+        // Aktiviert Steuerung per Klick
+        container.addEventListener('click', (e) => {
             window.focus();
             document.getElementById('focus-warning').style.display = 'none';
         });
 
-        window.addEventListener('keydown', (e) => {
+        // Event-Listener direkt an das Dokument binden
+        document.addEventListener('keydown', (e) => {
             const k = e.key.toLowerCase();
-            if (e.key in keys || k === 'w' || k === 'a' || k === 's' || k === 'd') {
-                if (k === 'w' || e.key === 'ArrowUp') keys.w = true;
-                if (k === 'a' || e.key === 'ArrowLeft') keys.a = true;
-                if (k === 's' || e.key === 'ArrowDown') keys.s = true;
-                if (k === 'd' || e.key === 'ArrowRight') keys.d = true;
-                e.preventDefault();
-            }
+            if (k === 'w' || e.key === 'ArrowUp') { keys.w = true; e.preventDefault(); }
+            if (k === 's' || e.key === 'ArrowDown') { keys.s = true; e.preventDefault(); }
+            if (k === 'a' || e.key === 'ArrowLeft') { keys.a = true; e.preventDefault(); }
+            if (k === 'd' || e.key === 'ArrowRight') { keys.d = true; e.preventDefault(); }
             if (k === 'r') resetGame();
         });
 
-        window.addEventListener('keyup', (e) => {
+        document.addEventListener('keyup', (e) => {
             const k = e.key.toLowerCase();
             if (k === 'w' || e.key === 'ArrowUp') keys.w = false;
-            if (k === 'a' || e.key === 'ArrowLeft') keys.a = false;
             if (k === 's' || e.key === 'ArrowDown') keys.s = false;
+            if (k === 'a' || e.key === 'ArrowLeft') keys.a = false;
             if (k === 'd' || e.key === 'ArrowRight') keys.d = false;
         });
 
-        const timerInterval = setInterval(() => {
+        // TIMER
+        setInterval(() => {
             if (!gameActive) return;
             timeLeft--;
-            
-            let minutes = Math.floor(timeLeft / 60);
-            let seconds = timeLeft % 60;
-            document.getElementById('time-val').innerText = (minutes < 10 ? "0" : "") + minutes + ":" + (seconds < 10 ? "0" : "") + seconds;
-
+            let m = Math.floor(timeLeft / 60), s = timeLeft % 60;
+            document.getElementById('time-val').innerText = (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s;
             if (timeLeft <= 0) {
                 gameActive = false;
                 document.getElementById('status-text').innerText = "🏆 GEWONNEN!";
@@ -333,132 +223,91 @@ game_html = """
         }, 1000);
 
         function resetGame() {
-            playerCar.position.set(8, 0.2, 8);
-            policeCar.position.set(-80, 0.2, -80);
-            speed = 0; angle = 0; timeLeft = 300;
-            gameActive = true;
+            playerCar.position.set(8, 0.2, 8); policeCar.position.set(-60, 0.2, -60);
+            speed = 0; angle = 0; timeLeft = 300; gameActive = true;
             document.getElementById('game-status').style.display = "none";
-            document.getElementById('focus-warning').style.display = 'none';
             window.focus();
         }
 
-        // ==========================================
-        // 6. ENGINE CORE LOOP
-        // ==========================================
+        // GAME LOOP
         function animate() {
             requestAnimationFrame(animate);
             if (!gameActive) return;
 
-            // --- STEUERUNG & PHYSIK RECHNER ---
-            if (keys.w) { 
-                if (speed < maxSpeed) speed += accel; 
-            } else if (keys.s) { 
-                if (speed > -maxSpeed/2) speed -= accel; 
-            } else {
+            // Beschleunigung berechnen
+            if (keys.w) { if (speed < maxSpeed) speed += accel; } 
+            else if (keys.s) { if (speed > -maxSpeed/2) speed -= accel; } 
+            else {
                 if (speed > 0) speed -= friction;
                 else if (speed < 0) speed += friction;
                 if (Math.abs(speed) < friction) speed = 0;
             }
 
             if (Math.abs(speed) > 0.05) {
-                const dirMod = speed > 0 ? 1 : -1;
-                if (keys.a) angle += turnSpeed * dirMod;
-                if (keys.d) angle -= turnSpeed * dirMod;
+                const dir = speed > 0 ? 1 : -1;
+                if (keys.a) angle += turnSpeed * dir;
+                if (keys.d) angle -= turnSpeed * dir;
             }
 
             playerCar.rotation.y = angle;
+            const oX = playerCar.position.x, oZ = playerCar.position.z;
 
-            // --- SEPARATE ACHSEN-KOLLISION ---
-            const origX = playerCar.position.x;
-            const origZ = playerCar.position.z;
-
+            // X-Achse bewegen & prüfen
             playerCar.position.x += Math.sin(angle) * speed;
             playerBox.setFromObject(pBody);
-            let collidedX = false;
-            for (let i = 0; i < collisionObstacles.length; i++) {
-                if (playerBox.intersectsBox(collisionObstacles[i].box)) { collidedX = true; break; }
-            }
-            if (collidedX) { playerCar.position.x = origX; speed *= -0.25; }
+            let hitX = false;
+            for(let i=0; i<collisionObstacles.length; i++) { if(playerBox.intersectsBox(collisionObstacles[i].box)) { hitX = true; break; } }
+            if(hitX) { playerCar.position.x = oX; speed *= -0.2; }
 
+            // Z-Achse bewegen & prüfen
             playerCar.position.z += Math.cos(angle) * speed;
             playerBox.setFromObject(pBody);
-            let collidedZ = false;
-            for (let i = 0; i < collisionObstacles.length; i++) {
-                if (playerBox.intersectsBox(collisionObstacles[i].box)) { collidedZ = true; break; }
-            }
-            if (collidedZ) { playerCar.position.z = origZ; speed *= -0.25; }
+            let hitZ = false;
+            for(let i=0; i<collisionObstacles.length; i++) { if(playerBox.intersectsBox(collisionObstacles[i].box)) { hitZ = true; break; } }
+            if(hitZ) { playerCar.position.z = oZ; speed *= -0.2; }
 
-            // --- KI POLIZEI ---
-            const deltaX = playerCar.position.x - policeCar.position.x;
-            const deltaZ = playerCar.position.z - policeCar.position.z;
-            const polAngle = Math.atan2(deltaX, deltaZ);
-            policeCar.rotation.y = polAngle;
-
-            const currentPoliceSpeed = 1.35; 
-            policeCar.position.x += Math.sin(polAngle) * currentPoliceSpeed;
-            policeCar.position.z += Math.cos(polAngle) * currentPoliceSpeed;
+            // POLIZEI KI
+            const dx = playerCar.position.x - policeCar.position.x, dz = playerCar.position.z - policeCar.position.z;
+            const pAngle = Math.atan2(dx, dz); policeCar.rotation.y = pAngle;
+            policeCar.position.x += Math.sin(pAngle) * 1.35; policeCar.position.z += Math.cos(pAngle) * 1.35;
             policeBox.setFromObject(polBody);
 
             blaulicht.material.color.setHex(Math.floor(Date.now() / 120) % 2 === 0 ? 0x0000ff : 0xff0000);
 
             if (playerBox.intersectsBox(policeBox)) {
                 gameActive = false;
-                document.getElementById('status-text').innerText = "💥 BUSTED / GAME OVER";
+                document.getElementById('status-text').innerText = "💥 GAME OVER";
                 document.getElementById('status-text').style.color = "#dc2626";
                 document.getElementById('game-status').style.display = "block";
             }
 
-            // --- KI ZIVIL-VERKEHR ---
-            npcTraffic.forEach((npc, idx) => {
-                const npcOrigX = npc.group.position.x;
-                const npcOrigZ = npc.group.position.z;
-
+            // TRAFFIC KI
+            npcTraffic.forEach((npc) => {
+                const nX = npc.group.position.x, nZ = npc.group.position.z;
                 if (npc.isX) npc.group.position.x += npc.speed * npc.dir;
                 else npc.group.position.z += npc.speed * npc.dir;
-
                 npc.box.setFromObject(npc.mesh);
 
-                let isBlocked = false;
-
-                for (let j = 0; j < npcTraffic.length; j++) {
-                    if (idx !== j && npc.box.intersectsBox(npcTraffic[j].box)) { isBlocked = true; break; }
+                let blocked = false;
+                for(let i=0; i<collisionObstacles.length; i++) { if(npc.box.intersectsBox(collisionObstacles[i].box)) { blocked = true; break; } }
+                if (blocked || Math.abs(npc.group.position.x) > mapSize/2 || Math.abs(npc.group.position.z) > mapSize/2) {
+                    npc.group.position.set(nX, 0.2, nZ); npc.dir *= -1;
                 }
-                for (let k = 0; k < collisionObstacles.length; k++) {
-                    if (npc.box.intersectsBox(collisionObstacles[k].box)) { isBlocked = true; break; }
-                }
-
-                if (isBlocked || Math.abs(npc.group.position.x) > mapSize/2 || Math.abs(npc.group.position.z) > mapSize/2) {
-                    npc.group.position.set(npcOrigX, 0.2, npcOrigZ);
-                    npc.dir *= -1; 
-                }
-
-                if (playerBox.intersectsBox(npc.box)) {
-                    playerCar.position.set(origX, 0.2, origZ);
-                    speed = -speed * 0.35;
-                }
+                if (playerBox.intersectsBox(npc.box)) { playerCar.position.set(oX, 0.2, oZ); speed *= -0.3; }
             });
 
-            // --- UI & KAMERA VERFOLGUNG ---
+            // UI & CAM
             document.getElementById('speed-val').innerText = Math.round(Math.abs(speed) * 115);
-
-            const wishCamX = playerCar.position.x - Math.sin(angle) * 16;
-            const wishCamZ = playerCar.position.z - Math.cos(angle) * 16;
-            const wishCamY = playerCar.position.y + 6.5;
-
-            camera.position.x += (wishCamX - camera.position.x) * 0.09;
-            camera.position.y += (wishCamY - camera.position.y) * 0.09;
-            camera.position.z += (wishCamZ - camera.position.z) * 0.09;
-            camera.lookAt(playerCar.position.x + Math.sin(angle) * 3, playerCar.position.y + 0.5, playerCar.position.z + Math.cos(angle) * 3);
+            camera.position.x += (playerCar.position.x - Math.sin(angle) * 16 - camera.position.x) * 0.09;
+            camera.position.y += (playerCar.position.y + 6.5 - camera.position.y) * 0.09;
+            camera.position.z += (playerCar.position.z - Math.cos(angle) * 16 - camera.position.z) * 0.09;
+            camera.lookAt(playerCar.position);
 
             renderer.render(scene, camera);
         }
 
-        window.addEventListener('resize', () => {
-            camera.aspect = container.clientWidth / container.clientHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(container.clientWidth, container.clientHeight);
-        });
-
+        // Direktfokus beim Laden erzwingen versuchen
+        window.onload = () => { window.focus(); };
         animate();
     </script>
 </body>
