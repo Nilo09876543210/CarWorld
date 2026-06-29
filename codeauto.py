@@ -8,36 +8,28 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-st.markdown("""
-    <style>
-    .reportview-container .main .block-container { padding-top: 1rem; padding-bottom: 1rem; }
-    h1 { color: #38bdf8 !important; font-family: sans-serif; font-weight: 800; margin-bottom: 5px; }
-    .stMarkdown p { color: #94a3b8; }
-    </style>
-""", unsafe_allow_html=True)
+st.title("🚗 Realistischer 3D City Driver (Tagmodus)")
+st.write("Klicke einmal in das Spielfeld. Steuerung mit WASD oder Pfeiltasten. Häuser blockieren jetzt die Durchfahrt!")
 
-st.title("🚗 3D Open World City Driver")
-st.write("KLICKE EINMAL IN DAS SPIELFELD, um die Steuerung zu aktivieren! Nutze dann WASD oder die Pfeiltasten.")
-
-# Optimierter HTML-Code mit Auto-Fokus
+# HTML/JavaScript Code mit hellem Himmel, Straßen-Textur-Ersatz und Kollisionen
 game_html = """
 <!DOCTYPE html>
 <html lang="de">
 <head>
     <meta charset="UTF-8">
     <style>
-        body { margin: 0; overflow: hidden; background-color: #0b0f19; font-family: sans-serif; }
-        #canvas-container { width: 100vw; height: 70vh; position: relative; border-radius: 12px; overflow: hidden; cursor: pointer; }
+        body { margin: 0; overflow: hidden; background-color: #7dd3fc; font-family: sans-serif; }
+        #canvas-container { width: 100vw; height: 75vh; position: relative; border-radius: 12px; overflow: hidden; }
         #ui-layer {
-            position: absolute; bottom: 20px; left: 20px; color: #38bdf8;
-            background: rgba(15, 23, 42, 0.85); padding: 15px 25px; border-radius: 10px;
-            font-size: 24px; font-weight: bold; border: 2px solid #1e293b; pointer-events: none;
+            position: absolute; bottom: 20px; left: 20px; color: #0f172a;
+            background: rgba(255, 255, 255, 0.9); padding: 15px 25px; border-radius: 10px;
+            font-size: 24px; font-weight: bold; border: 2px solid #cbd5e1; pointer-events: none;
         }
-        #ui-layer span { color: #f43f5e; }
+        #ui-layer span { color: #3b82f6; }
         #controls-hint {
-            position: absolute; top: 20px; right: 20px; color: #94a3b8;
-            background: rgba(15, 23, 42, 0.85); padding: 10px 15px; border-radius: 8px;
-            font-size: 13px; border: 1px solid #1e293b; pointer-events: none;
+            position: absolute; top: 20px; right: 20px; color: #334155;
+            background: rgba(255, 255, 255, 0.9); padding: 10px 15px; border-radius: 8px;
+            font-size: 13px; border: 1px solid #cbd5e1; pointer-events: none;
         }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -46,93 +38,137 @@ game_html = """
 
     <div id="canvas-container" onclick="window.focus();">
         <div id="ui-layer"><span id="speed-val">0</span> KM/H</div>
-        <div id="controls-hint">👉 <b>Hier klicken zum Aktivieren</b><br>Steuerung: WASD / Pfeiltasten</div>
+        <div id="controls-hint">🕹️ <b>Einmal klicken zum Steuern</b><br>WASD / Pfeiltasten</div>
     </div>
 
     <script>
-        // --- 1. SETUP ---
+        // --- 1. SETUP & HELLER HIMMEL ---
         const container = document.getElementById('canvas-container');
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x0b0f19);
-        scene.fog = new THREE.FogExp2(0x0b0f19, 0.015);
+        scene.background = new THREE.Color(0xbae6fd); // Heller, blauer Himmel (Tagmodus)
+        scene.fog = new THREE.FogExp2(0xbae6fd, 0.008);
 
-        const camera = new THREE.PerspectiveCamera(65, container.clientWidth / container.clientHeight, 0.1, 1000);
+        const camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(container.clientWidth, container.clientHeight);
         renderer.shadowMap.enabled = true;
         container.appendChild(renderer.domElement);
 
-        // --- 2. LIGHTS ---
-        scene.add(new THREE.AmbientLight(0xffffff, 0.3));
-        const light = new THREE.DirectionalLight(0x38bdf8, 0.8);
-        light.position.set(50, 150, 50);
-        scene.add(light);
+        // --- 2. TAGESLICHT (Sonne) ---
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
 
-        // --- 3. MAP (Stadt) ---
-        const mapSize = 500;
+        const sunLight = new THREE.DirectionalLight(0xfffbeb, 1.0); // Starke Sonne
+        sunLight.position.set(100, 200, 70);
+        sunLight.castShadow = true;
+        scene.add(sunLight);
+
+        // --- 3. STRASSENSYSTEM & GEBÄUDE ---
+        const mapSize = 600;
+        
+        // Grüner Untergrund (Wiese neben den Straßen)
         const ground = new THREE.Mesh(
             new THREE.PlaneGeometry(mapSize, mapSize),
-            new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.8 })
+            new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.9 })
         );
         ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
         scene.add(ground);
 
-        // Grid für Sichtbarkeit bei Nacht
-        const grid = new THREE.GridHelper(mapSize, 40, 0x38bdf8, 0x1e293b);
-        grid.position.y = 0.01;
-        scene.add(grid);
+        // Listen für Gebäude-Kollisionen
+        const buildings = [];
+        const buildingBoxen = [];
 
-        // Gebäude
-        const buildingGroup = new THREE.Group();
-        for (let x = -mapSize/2; x < mapSize/2; x += 30) {
-            for (let z = -mapSize/2; z < mapSize/2; z += 30) {
-                if (Math.abs(x) < 20 && Math.abs(z) < 20) continue;
-                if (Math.random() > 0.4) {
-                    const h = 15 + Math.random() * 50;
-                    const b = new THREE.Mesh(
-                        new THREE.BoxGeometry(12, h, 12),
-                        new THREE.MeshStandardMaterial({ color: new THREE.Color().setHSL(0.6, 0.6, 0.2), roughness: 0.5 })
-                    );
-                    b.position.set(x, h/2, z);
-                    buildingGroup.add(b);
+        // Stadt-Layout mit festen Straßenkreuzungen generieren
+        const blockSize = 40;
+        const roadWidth = 14;
+
+        for (let x = -mapSize/2; x < mapSize/2; x += blockSize) {
+            for (let z = -mapSize/2; z < mapSize/2; z += blockSize) {
+                // Startbereich im Zentrum komplett freihalten für Straßen
+                if (Math.abs(x) < 30 && Math.abs(z) < 30) {
+                    createRoadPlane(x, z, blockSize);
+                    continue;
+                }
+
+                // Asphalt-Fläche für Straßen erzeugen
+                createRoadPlane(x, z, blockSize);
+
+                // Häuserblöcke nur abseits der Straßen setzen (Zufall)
+                if (Math.random() > 0.3) {
+                    const hHeight = 20 + Math.random() * 50;
+                    const hWidth = blockSize - roadWidth;
+                    const hDepth = blockSize - roadWidth;
+
+                    // Realistische Gebäudefarben (Grau, Beige, Weiß)
+                    const colorPalette = [0x94a3b8, 0xe2e8f0, 0xcbd5e1, 0x64748b];
+                    const randomColor = colorPalette[Math.floor(Math.random() * colorPalette.length)];
+
+                    const bMat = new THREE.MeshStandardMaterial({ color: randomColor, roughness: 0.4 });
+                    const bGeo = new THREE.BoxGeometry(hWidth, hHeight, hDepth);
+                    const building = new THREE.Mesh(bGeo, bMat);
+                    
+                    // Positionierung genau im Raster-Zentrum des Blocks
+                    building.position.set(x + roadWidth, hHeight/2, z + roadWidth);
+                    building.castShadow = true;
+                    building.receiveShadow = true;
+                    
+                    scene.add(building);
+                    buildings.push(building);
+
+                    // Unsichtbare 3D-Kollisionsbox für dieses Haus erstellen
+                    const box = new THREE.Box3().setFromObject(building);
+                    buildingBoxen.push(box);
                 }
             }
         }
-        scene.add(buildingGroup);
 
-        // --- 4. AUTO ---
+        // Hilfsfunktion für graue Asphalt-Straßen
+        function createRoadPlane(x, z, size) {
+            const road = new THREE.Mesh(
+                new THREE.PlaneGeometry(size, size),
+                new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.7 }) // Dunkelgrauer Asphalt
+            );
+            road.rotation.x = -Math.PI / 2;
+            road.position.set(x + size/2, 0.02, z + size/2);
+            road.receiveShadow = true;
+            scene.add(road);
+        }
+
+        // --- 4. DAS AUTO ---
         const car = new THREE.Group();
-        const carBody = new THREE.Mesh(new THREE.BoxGeometry(2, 0.6, 4), new THREE.MeshStandardMaterial({ color: 0x3b82f6 }));
+        const carBody = new THREE.Mesh(
+            new THREE.BoxGeometry(2, 0.6, 4), 
+            new THREE.MeshStandardMaterial({ color: 0xef4444, metalness: 0.6, roughness: 0.2 }) // Roter Sportwagen
+        );
         carBody.position.y = 0.5;
+        carBody.castShadow = true;
         car.add(carBody);
-        
-        // Scheinwerfer
-        const sGeo = new THREE.BoxGeometry(0.2, 0.1, 0.1);
-        const sMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-        const s1 = new THREE.Mesh(sGeo, sMat); s1.position.set(-0.7, 0.5, 2); car.add(s1);
-        const s2 = new THREE.Mesh(sGeo, sMat); s2.position.set(0.7, 0.5, 2); car.add(s2);
+
+        // Cockpit-Scheiben
+        const glass = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.5, 1.8), new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.1 }));
+        glass.position.set(0, 0.9, -0.1);
+        car.add(glass);
         
         scene.add(car);
 
-        // --- 5. INTERNE STEUERUNG LOGIK ---
-        let speed = 0, maxSpeed = 1.5, accel = 0.03, friction = 0.015, angle = 0, turnSpeed = 0.04;
+        // Kollisionsbox für das Auto initialisieren
+        const carBox = new THREE.Box3();
+
+        // --- 5. BEWEGUNG & KOLLISIONS-ABFRAGE ---
+        let speed = 0, maxSpeed = 1.6, accel = 0.04, friction = 0.02, angle = 0, turnSpeed = 0.04;
         const keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
         
         window.addEventListener('keydown', (e) => { 
-            if (e.key in keys) {
-                keys[e.key] = true;
-                e.preventDefault(); // Verhindert Scrollen des Browsers
-            }
+            if (e.key in keys) { keys[e.key] = true; e.preventDefault(); }
         });
         window.addEventListener('keyup', (e) => { if (e.key in keys) keys[e.key] = false; });
-
-        // Auto-Fokus Versuch bei Mausbewegung über das Spiel
-        container.addEventListener('mouseenter', () => { window.focus(); });
 
         // --- 6. GAME LOOP ---
         function animate() {
             requestAnimationFrame(animate);
 
+            // Fahrphysik-Berechnung
             if (keys.w || keys.ArrowUp) { if (speed < maxSpeed) speed += accel; }
             else if (keys.s || keys.ArrowDown) { if (speed > -maxSpeed/2) speed -= accel; }
             else {
@@ -148,15 +184,44 @@ game_html = """
             }
 
             car.rotation.y = angle;
-            car.position.x += Math.sin(angle) * speed;
-            car.position.z += Math.cos(angle) * speed;
 
+            // --- KOLLISIONS-CHECK VOR DEM BEWEGEN ---
+            // Wir berechnen die theoretisch neue Position vorab
+            const nextX = car.position.x + Math.sin(angle) * speed;
+            const nextZ = car.position.z + Math.cos(angle) * speed;
+
+            // Temporär auf die neue Position setzen, um Box zu prüfen
+            const oldX = car.position.x;
+            const oldZ = car.position.z;
+            car.position.x = nextX;
+            car.position.z = nextZ;
+
+            // Auto-Kollisionsbox updaten
+            carBox.setFromObject(carBody);
+
+            let kollision = false;
+            // Prüfen, ob wir eine der Haus-Boxen berühren
+            for (let i = 0; i < buildingBoxen.length; i++) {
+                if (carBox.intersectsBox(buildingBoxen[i])) {
+                    kollision = true;
+                    break;
+                }
+            }
+
+            if (kollision) {
+                // Bei Kollision: Bewegung stoppen und leicht zurückbouncen
+                car.position.x = oldX;
+                car.position.z = oldZ;
+                speed = -speed * 0.3; // Prallt ab
+            }
+
+            // Tacho aktualisieren
             document.getElementById('speed-val').innerText = Math.round(Math.abs(speed) * 100);
 
-            // Kamera-Verfolgung
-            camera.position.x += (car.position.x - Math.sin(angle) * 12 - camera.position.x) * 0.1;
-            camera.position.y += (car.position.y + 4.5 - camera.position.y) * 0.1;
-            camera.position.z += (car.position.z - Math.cos(angle) * 12 - camera.position.z) * 0.1;
+            // Smooth Third-Person Kameraverfolgung
+            camera.position.x += (car.position.x - Math.sin(angle) * 14 - camera.position.x) * 0.1;
+            camera.position.y += (car.position.y + 5.5 - camera.position.y) * 0.1;
+            camera.position.z += (car.position.z - Math.cos(angle) * 14 - camera.position.z) * 0.1;
             camera.lookAt(car.position.x, car.position.y + 1, car.position.z);
 
             renderer.render(scene, camera);
@@ -168,4 +233,4 @@ game_html = """
 </html>
 """
 
-components.html(game_html, height=620, scrolling=False)
+components.html(game_html, height=640, scrolling=False)
